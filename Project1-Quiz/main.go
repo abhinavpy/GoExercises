@@ -4,12 +4,14 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"time"
 )
 
 func main() {
 	// in this code basically we are going to write our code that presents the quiz problems except users
 	// input and checks for correctness
 	csvFilename := flag.String("csv", "problems.csv", "a csv file in the format of the 'question,answer'")
+	timeLimit := flag.Int("limit", 3, "the time limit for the quiz in seconds")
 	flag.Parse()
 	
 	// this will read the file
@@ -32,17 +34,31 @@ func main() {
 	//fmt.Println(lines)
 	problems := parseLines(lines)
 	
+	timer := time.NewTimer(time.Duration(*timeLimit) * time.Second)
 	correct := 0
+
 	for i, p := range problems {
-		fmt.Printf("Problem #%d: %s = \n", i + 1, p.q)
-		var answer string
-		fmt.Scanf("%s\n", &answer) // we are going to pass in a reference to answer; remember scanf trims all spaces
-		if answer == p.a {
-			fmt.Println("Correct!")
-			correct++
-		} else {
-			fmt.Println("Incorrect answer.")
+		fmt.Printf("Problem #%d: %s = ", i + 1, p.q)
+		answerChannel := make(chan string)
+		go func() {
+			var answer string
+			fmt.Scanf("%s\n", &answer)
+			answerChannel <- answer
+		}()
+
+		select {
+		case <- timer.C:
+			fmt.Printf("You scored %d out of %d.\n", correct, len(problems))
+			return 
+		case answer := <- answerChannel: 
+			if answer == p.a {
+				fmt.Println("Correct!")
+				correct++
+			} else {
+				fmt.Println("Incorrect answer.")
+			}
 		}
+		
 	}
 	fmt.Printf("You scored %d out of %d", correct, len(problems))
 }
